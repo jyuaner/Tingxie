@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+
+# 模型权重不随仓库分发（约 138 MB）
+models/whisper-base/
+!models/README.md
+
+# 本地运行时数据
+*.log
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.webm
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

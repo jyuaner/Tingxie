@@ -1,0 +1,86 @@
+"""Tingxie launcher: serve the local web UI on loopback and open the browser."""
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import socket
+import sys
+import tempfile
+import threading
+import webbrowser
+from pathlib import Path
+
+from transcriber import DEFAULT_MODEL_DIR, OfflineTranscriber
+from webapp import JobManager, create_app
+
+BANNER = "听写 · 本地语音转文字（完全离线）"
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+def _workspace() -> Path:
+    """Temporary workspace for uploads; removed when the process exits."""
+    from transcriber import _bundle_root  # local import keeps startup cheap
+
+    base = Path(tempfile.gettempdir()) / "tingxie"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="听写 · 本地离线语音转文字")
+    parser.add_argument("--port", type=int, default=0, help="固定端口，默认自动选择空闲端口")
+    parser.add_argument("--no-browser", action="store_true", help="启动后不自动打开浏览器")
+    parser.add_argument("--debug", action="store_true", help="使用 Flask 开发服务器并输出调试日志")
+    parser.add_argument("--model", default=str(DEFAULT_MODEL_DIR), help="whisper-base 模型目录")
+    args = parser.parse_args(argv)
+
+    model_dir = Path(args.model).resolve()
+    engine = OfflineTranscriber(model_dir)
+    manager = JobManager(engine, _workspace())
+    server_holder: dict[str, object] = {}
+
+    def shutdown() -> None:
+        server = server_holder.get("server")
+        if server is not None:
+            try:
+                server.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        os._exit(0)
+
+    app = create_app(manager, shutdown)
+    port = args.port or _free_port()
+    url = f"http://127.0.0.1:{port}/"
+
+    print(BANNER)
+    print(f"模型目录：{model_dir}")
+    print(f"模型状态：{'已就绪' if engine.model_ready else '不完整（请检查 models/whisper-base）'}")
+    print(f"访问地址：{url}")
+    print("关闭此窗口或按 Ctrl+C 结束程序。\n")
+
+    if not args.no_browser:
+        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+
+    if args.debug:
+        app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
+        return 0
+
+    from waitress import create_server
+
+    server = create_server(app, host="127.0.0.1", port=port, threads=4, clear_untrusted_proxy_headers=True)
+    server_holder["server"] = server
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
