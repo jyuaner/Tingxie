@@ -18,7 +18,7 @@ Tingxie (听写) is a small desktop tool for Windows 10/11 x64 that records from
 
 ## Quick start (end users)
 
-1. Download `Tingxie-Windows-x64-offline.zip` from [Releases](../../releases) (~230 MB).
+1. Download `Tingxie-Windows-x64-offline.zip` from [Releases](../../releases) (~250 MB).
 2. **Extract the whole folder** — the EXE needs `_internal/` next to it (model + runtime live there).
 3. Double-click `Tingxie.exe`; the browser opens the local UI automatically.
 4. Record or import → pick a language → transcribe → edit / copy / export.

@@ -43,7 +43,7 @@
 
 ## 快速开始（普通用户）
 
-1. 在 [Releases](../../releases) 下载 `Tingxie-Windows-x64-offline.zip`（约 224 MB）；
+1. 在 [Releases](../../releases) 下载 `Tingxie-Windows-x64-offline.zip`（约 250 MB）；
 2. **完整解压**到任意目录（不要只把 EXE 拖出来，`_internal` 里是模型和运行环境）；
 3. 双击 `Tingxie.exe`，程序会自动打开浏览器页面；
 4. 录音或导入音频 → 选语言 → 开始转写 → 编辑/复制/导出。
