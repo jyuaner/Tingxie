@@ -179,6 +179,14 @@
               <option value="auto">自动检测</option>
             </select>
           </div>
+          <div class="language-row engine-row">
+            <label for="engine">识别方式</label
+            ><select id="engine">
+              <option value="auto">自动（云端优先，失败回退本地）</option>
+              <option value="local">仅本地 · 离线</option>
+              <option value="online">仅云端 · 联网</option>
+            </select>
+          </div>
           <button
             id="transcribe-button"
             class="primary full transcribe"

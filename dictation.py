@@ -22,6 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
+from asr import AsrRouter, load_config
 from transcriber import DEFAULT_MODEL_DIR, SAMPLE_RATE, OfflineTranscriber
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -55,14 +56,76 @@ MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 MOD_NOREPEAT = 0x4000
 
-KEY_NAMES = {
+KEY_TABLE = {
     "scroll": 0x91, "pause": 0x13, "capslock": 0x14, "insert": 0x2D,
     "home": 0x24, "end": 0x23, "pageup": 0x21, "pagedown": 0x22,
-    "f1": 0x70, "f2": 0x71, "f3": 0x72, "f4": 0x73, "f5": 0x74, "f6": 0x75,
-    "f7": 0x76, "f8": 0x77, "f9": 0x78, "f10": 0x79, "f11": 0x7A, "f12": 0x7B,
-    "f13": 0x7C, "f14": 0x7D, "f15": 0x7E, "f16": 0x7F,
-    "apps": 0x5D, "ralt": 0xA5, "rctrl": 0xA3,
+    "space": 0x20, "enter": 0x0D, "return": 0x0D, "tab": 0x09,
+    "backspace": 0x08, "esc": 0x1B, "escape": 0x1B, "delete": 0x2E, "del": 0x2E,
+    "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28,
+    "apps": 0x5D, "ralt": 0xA5, "rctrl": 0xA3, "lwin": 0x5B, "rwin": 0x5C,
+    "`": 0xC0, "-": 0xBD, "=": 0xBB, ",": 0xBC, ".": 0xBE, "/": 0xBF,
+    ";": 0xBA, "'": 0xDE, "[": 0xDB, "]": 0xDD, "\\": 0xDC,
 }
+KEY_TABLE.update({f"f{i}": 0x6F + i for i in range(1, 25)})
+KEY_TABLE.update({chr(code): code - 32 for code in range(ord("a"), ord("z") + 1)})
+KEY_TABLE.update({str(digit): 0x30 + digit for digit in range(10)})
+KEY_NAMES = KEY_TABLE  # 兼容旧名字
+
+#: 鼠标触发源：x1/x2 是侧键，middle 是中键（左右键不做，会毁掉正常点击）
+MOUSE_TRIGGERS = {
+    "x1": XBUTTON1, "back": XBUTTON1, "后退": XBUTTON1, "侧键1": XBUTTON1,
+    "x2": XBUTTON2, "forward": XBUTTON2, "前进": XBUTTON2, "侧键2": XBUTTON2,
+    "middle": 0, "中键": 0, "m3": 0,
+}
+MOD_TOKENS = {"ctrl": MOD_CONTROL, "control": MOD_CONTROL,
+              "alt": MOD_ALT, "shift": MOD_SHIFT, "win": MOD_WIN, "super": MOD_WIN}
+
+
+def parse_trigger(value: str) -> tuple:
+    """解析触发键："x1" / "f9" / "ctrl+shift+d" / "vk:0x7B"。
+
+    返回 ("mouse", XBUTTON1|XBUTTON2|0) 或 ("key", mods, vk)。
+    """
+    raw = (value or "").strip().lower()
+    if not raw:
+        raise SystemExit("触发键不能为空，例如 x1、f9、ctrl+shift+d")
+    if raw in MOUSE_TRIGGERS:
+        return "mouse", MOUSE_TRIGGERS[raw]
+    if raw.startswith("vk:"):
+        try:
+            return "key", 0, int(raw[3:], 16)
+        except ValueError:
+            raise SystemExit(f"vk: 后面要写十六进制，例如 vk:0x7B，而不是 {value}") from None
+    mods = 0
+    keys: list[int] = []
+    for part in [p for p in raw.split("+") if p]:
+        if part in MOD_TOKENS:
+            mods |= MOD_TOKENS[part]
+        elif part in KEY_TABLE:
+            keys.append(KEY_TABLE[part])
+        else:
+            raise SystemExit(
+                f"不认识 {part!r}。可用鼠标 x1/x2/middle，键盘 "
+                f"{', '.join(sorted(KEY_TABLE))}，或用 vk:0x.. 直接写虚拟键码"
+            )
+    if len(keys) != 1:
+        raise SystemExit("触发键必须是「修饰键 + 一个键」，例如 ctrl+shift+d 或 f9")
+    return "key", mods, keys[0]
+
+
+def trigger_label(spec: tuple) -> str:
+    if spec[0] == "mouse":
+        return {XBUTTON1: "鼠标侧键 XBUTTON1（后退键）",
+                XBUTTON2: "鼠标侧键 XBUTTON2（前进键）",
+                0: "鼠标中键"}.get(spec[1], "鼠标键")
+    mods, vk = spec[1], spec[2]
+    names = {v: k for k, v in KEY_TABLE.items()}
+    parts = []
+    for bit, name in ((MOD_CONTROL, "Ctrl"), (MOD_ALT, "Alt"), (MOD_SHIFT, "Shift"), (MOD_WIN, "Win")):
+        if mods & bit:
+            parts.append(name)
+    parts.append(names.get(vk, f"vk=0x{vk:02X}"))
+    return "+".join(parts)
 
 
 class MSLLHOOKSTRUCT(ctypes.Structure):
@@ -92,6 +155,8 @@ user32.CallNextHookEx.argtypes = (ctypes.c_void_p, ctypes.c_int, wintypes.WPARAM
 user32.CallNextHookEx.restype = ctypes.c_ssize_t
 user32.UnhookWindowsHookEx.argtypes = (ctypes.c_void_p,)
 user32.GetMessageW.argtypes = (ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT)
+user32.GetAsyncKeyState.argtypes = (ctypes.c_int,)
+user32.GetAsyncKeyState.restype = ctypes.c_short
 
 # 64 位下必须声明 restype，否则句柄会被截断成 int，GlobalLock 直接崩
 user32.OpenClipboard.argtypes = (wintypes.HWND,)
@@ -382,35 +447,54 @@ def wav_to_array(path: str | os.PathLike[str]) -> np.ndarray:
 class Dictation:
     def __init__(self, args) -> None:
         self.args = args
-        self.engine = OfflineTranscriber(Path(args.model))
+        self.config = load_config(getattr(args, "config", None))
+        self.router = AsrRouter(
+            OfflineTranscriber(Path(args.model)),
+            self.config,
+            mode=getattr(args, "asr", "") or None,
+        )
+        self.engine = self.router.local
         self.recorder = Recorder(device=args.device, max_seconds=args.max_seconds)
         self.state = "idle"  # idle | recording | busy
         self._lock = threading.Lock()
         self._last_trigger = 0.0
-        self._target_button = self._parse_button(args.button)
+        self.trigger_spec = parse_trigger(args.trigger)
+        self._target_button = self.trigger_spec  # 兼容旧引用
         self._seen_events = 0          # 钩子收到的事件计数（自检用）
         self._selftest_running = False
 
-    # --- 触发源解析
-    @staticmethod
-    def _parse_button(value: str) -> tuple[str, int]:
-        v = value.strip().lower()
-        if v in ("x1", "1", "back", "后退"):
-            return "mouse", XBUTTON1
-        if v in ("x2", "2", "forward", "前进"):
-            return "mouse", XBUTTON2
-        if v in ("middle", "3", "滚轮", "中键"):
-            return "mouse", 0  # 预留：中键走 WM_MBUTTONDOWN 分支
-        if v in KEY_NAMES:
-            return "key", KEY_NAMES[v]
-        raise SystemExit(f"不认识的按键：{value}（可用 x1/x2，或 {', '.join(sorted(KEY_NAMES))}）")
-
+    # --- 触发源
     def log(self, message: str, symbol: str = "·") -> None:
         print(f"[{datetime.now():%H:%M:%S}] {symbol} {message}", flush=True)
 
+    # --- 修饰键状态
+    @staticmethod
+    def _key_down(vk: int) -> bool:
+        return bool(user32.GetAsyncKeyState(vk) & 0x8000)
+
+    def _modifiers_ok(self, required: int) -> bool:
+        """要求的修饰键必须按下；没要求的时候不允许 Ctrl/Alt/Win 同时按着（防误触）。"""
+        pressed = {
+            MOD_CONTROL: self._key_down(0x11) or self._key_down(0xA2) or self._key_down(0xA3),
+            MOD_ALT: self._key_down(0x12) or self._key_down(0xA4) or self._key_down(0xA5),
+            MOD_SHIFT: self._key_down(0x10) or self._key_down(0xA0) or self._key_down(0xA1),
+            MOD_WIN: self._key_down(0x5B) or self._key_down(0x5C),
+        }
+        for bit, is_down in pressed.items():
+            if required & bit:
+                if not is_down:
+                    return False
+            elif is_down and bit in (MOD_CONTROL, MOD_ALT, MOD_WIN):
+                return False
+        return True
+
     # --- 钩子
-    def install(self) -> None:
-        kind, code = self._target_button
+    def install(self) -> bool:
+        spec = self.trigger_spec
+        kind = spec[0]
+        mouse_code = spec[1] if kind == "mouse" else None
+        key_mods = spec[1] if kind == "key" else 0
+        key_vk = spec[2] if kind == "key" else None
 
         def mouse_proc(n_code, w_param, l_param):
             if n_code >= 0:
@@ -419,14 +503,17 @@ class Dictation:
                 if self.args.debug_events and w_param in (WM_XBUTTONDOWN, WM_MBUTTONDOWN):
                     print(
                         f"[debug] wparam=0x{w_param:04X} xbutton={(info.mouseData >> 16) & 0xFFFF} "
-                        f"injected={bool(info.flags & LLMHF_INJECTED)} target={self._target_button}",
+                        f"injected={bool(info.flags & LLMHF_INJECTED)} trigger={trigger_label(self.trigger_spec)}",
                         flush=True,
                     )
                 if kind == "mouse":
-                    if code == 0 and w_param == WM_MBUTTONDOWN:
+                    if mouse_code == 0 and w_param == WM_MBUTTONDOWN:
                         pressed = True
                     else:
-                        pressed = w_param == WM_XBUTTONDOWN and ((info.mouseData >> 16) & 0xFFFF) == code
+                        pressed = (
+                            w_param == WM_XBUTTONDOWN
+                            and ((info.mouseData >> 16) & 0xFFFF) == mouse_code
+                        )
                     if pressed and not (info.flags & LLMHF_INJECTED and not self.args.allow_injected):
                         self.trigger()
                         return 1  # 吃掉事件：浏览器不会因此后退/前进
@@ -437,7 +524,11 @@ class Dictation:
                 info = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
                 if info.flags & LLKHF_INJECTED and not self.args.allow_injected:
                     return user32.CallNextHookEx(None, n_code, w_param, l_param)
-                if kind == "key" and info.vkCode == code:
+                if (
+                    kind == "key"
+                    and info.vkCode == key_vk
+                    and self._modifiers_ok(key_mods)
+                ):
                     self.trigger()
                     return 1
                 if info.vkCode == VK_ESCAPE and self.state == "recording":
@@ -585,8 +676,9 @@ class Dictation:
     def _transcribe_and_type(self, audio: np.ndarray) -> None:
         started = time.time()
         try:
-            result = self.engine.transcribe_array(audio, self.args.language)
+            result = self.router.transcribe(audio, self.args.language)
             text = (result.get("text") or "").strip()
+            engine = result.get("engine") or "local"
             elapsed = time.time() - started
             if not text:
                 tone_error()
@@ -600,7 +692,7 @@ class Dictation:
                 )
                 if ok:
                     tone_done()
-                    self.log(f"{len(text)} 字 / {elapsed:.1f}s → {text}", "✓")
+                    self.log(f"{len(text)} 字 / {elapsed:.1f}s（{ '云端' if engine == 'online' else '本地' }）→ {text}", "✓")
                 else:
                     tone_error()
                     self.log("上屏失败，文字已放到剪贴板，可手动 Ctrl+V", "✗")
@@ -621,14 +713,21 @@ class Dictation:
         user32.PostThreadMessageW(kernel32.GetCurrentThreadId(), WM_QUIT, 0, 0)
 
     def preload(self) -> None:
+        info = self.router.describe()
+        if info["mode"] == "online" and info["online_ready"]:
+            self.log("云端模式：跳过本地模型预热", "·")
+            return
         if not self.engine.model_ready:
-            self.log("模型不完整，请检查 models/whisper-base", "✗")
+            if info["online_ready"]:
+                self.log("本地模型不完整，但云端已就绪，会自动走云端", "!")
+            else:
+                self.log("模型不完整，请检查 models/whisper-base 或配置云端", "✗")
             return
         try:
             started = time.time()
             self.engine.ensure_model_ready()
             self.engine._load_model()
-            self.log(f"模型已预热（{time.time() - started:.1f}s）", "·")
+            self.log(f"本地模型已预热（{time.time() - started:.1f}s）", "·")
         except Exception as exc:  # noqa: BLE001
             self.log(f"模型预热失败：{exc}", "!")
 
@@ -670,7 +769,8 @@ def probe(duration: float = 30.0) -> None:
     if not hooks[0]:
         raise SystemExit("钩子安装失败")
     print(f"诊断模式：{duration:.0f} 秒内按下你想用的那个键（建议按鼠标侧键、键盘 F 区各一次）", flush=True)
-    print("看到 `侧键按下 XBUTTON1/XBUTTON2` 就用 --button x1 / x2；看到 `key: vk=0x..` 就用 --button f9 之类。", flush=True)
+    print("看到 `侧键按下 XBUTTON1/XBUTTON2` 就用 --trigger x1 / x2；"
+          "看到 `key: vk=0x..` 就用 --trigger f9（或直接 --trigger vk:0x..）。", flush=True)
     deadline = time.time() + duration
     msg = wintypes.MSG()
     while time.time() < deadline:
@@ -686,36 +786,18 @@ def probe(duration: float = 30.0) -> None:
 
 def parse_hotkey(value: str) -> tuple[int, int]:
     """把 "ctrl+alt+d" / "f9" 解析成 (修饰键, 虚拟键码)。"""
-    names = {
-        "space": 0x20, "enter": 0x0D, "tab": 0x09, "backspace": 0x08, "esc": 0x1B,
-        "escape": 0x1B, "pause": 0x13, "scroll": 0x91, "capslock": 0x14,
-        "insert": 0x2D, "home": 0x24, "end": 0x23, "pageup": 0x21, "pagedown": 0x22,
-        "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28,
-        "`": 0xC0, "-": 0xBD, "=": 0xBB, ",": 0xBC, ".": 0xBE, "/": 0xBF,
-        ";": 0xBA, "'": 0xDE, "[": 0xDB, "]": 0xDD, "\\": 0xDC,
-    }
-    names.update({f"f{i}": 0x6F + i for i in range(1, 25)})
-    names.update({chr(c): c - 32 for c in range(ord("a"), ord("z") + 1)})
-    names.update({str(d): 0x30 + d for d in range(10)})
-
     mods = 0
-    vk = None
+    keys: list[int] = []
     for part in [p.strip().lower() for p in value.split("+") if p.strip()]:
-        if part in ("ctrl", "control"):
-            mods |= MOD_CONTROL
-        elif part == "alt":
-            mods |= MOD_ALT
-        elif part == "shift":
-            mods |= MOD_SHIFT
-        elif part in ("win", "super", "meta"):
-            mods |= MOD_WIN
-        elif part in names:
-            vk = names[part]
+        if part in MOD_TOKENS:
+            mods |= MOD_TOKENS[part]
+        elif part in KEY_TABLE:
+            keys.append(KEY_TABLE[part])
         else:
             raise ValueError(f"不认识的快捷键片段：{part}")
-    if vk is None:
+    if len(keys) != 1:
         raise ValueError("快捷键必须以一个键结尾，例如 ctrl+alt+d")
-    return mods, vk
+    return mods, keys[0]
 
 
 def selftest(duration: float = 2.5) -> int:
@@ -754,11 +836,18 @@ def selftest(duration: float = 2.5) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="全局听写：按一下侧键开始，再按一下停止，文字自动上屏",
+        description="全局听写：按一下触发键开始，再按一下停止，文字自动上屏",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--button", default="x1", help="触发键：x1/x2（鼠标侧键）或 f9/capslock/scroll 等")
+    parser.add_argument(
+        "--trigger", "--button", "--key", dest="trigger", default="x1",
+        help="触发键：x1/x2/middle、f9、ctrl+shift+d、vk:0x7B（--button/--key 是它的别名）",
+    )
+    parser.add_argument("--list-keys", action="store_true", help="列出可用的键盘按键名后退出")
     parser.add_argument("--language", default="zh", choices=["zh", "en", "auto"], help="识别语言")
+    parser.add_argument("--asr", default="", choices=["", "auto", "local", "online"],
+                        help="识别引擎：local 离线 / online 云端 / auto 自动（默认按 config.json）")
+    parser.add_argument("--config", default=None, help="配置文件路径（默认 EXE 同目录的 config.json）")
     parser.add_argument("--model", default=str(DEFAULT_MODEL_DIR), help="whisper-base 模型目录")
     parser.add_argument("--device", type=int, default=None, help="录音设备序号（见 --devices）")
     parser.add_argument("--devices", action="store_true", help="列出录音设备后退出")
@@ -789,6 +878,14 @@ def main(argv: list[str] | None = None) -> int:
         pass
     args = build_parser().parse_args(argv)
 
+    if args.list_keys:
+        print("鼠标：x1（后退侧键）/ x2（前进侧键）/ middle（中键）")
+        print("键盘：" + ", ".join(sorted(KEY_TABLE)))
+        print("组合键：ctrl+alt+d、ctrl+shift+space、win+f9 …（修饰键 ctrl / alt / shift / win）")
+        print("任意键：vk:0x7B（十六进制虚拟键码，可用 --probe 查）")
+        print("\n用法：听写-全局输入.cmd --trigger ctrl+shift+d")
+        return 0
+
     if args.devices:
         import sounddevice as sd
 
@@ -811,13 +908,26 @@ def main(argv: list[str] | None = None) -> int:
 
         beep = lambda *a, **k: None  # noqa: E731
 
+    if args.trigger == "x1":  # 没在命令行指定时，允许 config.json 覆盖
+        try:
+            configured = load_config(args.config).get("trigger")
+        except Exception:
+            configured = None
+        if configured:
+            args.trigger = str(configured)
+
     app = Dictation(args)
-    kind, code = app._target_button
-    label = {XBUTTON1: "鼠标侧键 XBUTTON1（后退键）", XBUTTON2: "鼠标侧键 XBUTTON2（前进键）"}.get(
-        code, f"{kind} {code:#04x}"
-    )
+    label = trigger_label(app.trigger_spec)
     print("听写 · 全局语音输入", flush=True)
     print(f"触发键：{label}   语言：{args.language}", flush=True)
+    info = app.router.describe()
+    mode_label = {"local": "只用本地（离线）", "online": "只用云端（联网）", "auto": "自动（云端优先，失败回退本地）"}[info["mode"]]
+    print(f"识别引擎：{mode_label}", flush=True)
+    print(
+        f"  本地模型：{'就绪' if info['local_ready'] else '不可用'}"
+        f"    云端：{'已配置 ' + (info['online_host'] or '') + ' / ' + (info['online_model'] or '') if info['online_ready'] else '未配置（config.json 里填 online.api_key）'}",
+        flush=True,
+    )
     if args.hotkey:
         print(f"备用快捷键：{args.hotkey}", flush=True)
     print(f"输出方式：{'逐字输入' if args.type_mode else '粘贴（Ctrl+V）'}", flush=True)
@@ -856,8 +966,9 @@ def main(argv: list[str] | None = None) -> int:
             print("钩子自检：没收到任何鼠标事件，侧键可能不可用", flush=True)
             hook_ok = False
         if not hook_ok and not args.hotkey:
-            args.hotkey = "ctrl+alt+d"
-            print("已自动改用备用快捷键 ctrl+alt+d（可用 --hotkey 换键）", flush=True)
+            spec = app.trigger_spec
+            args.hotkey = trigger_label(spec) if spec[0] == "key" and spec[1] else "ctrl+alt+d"
+            print(f"已自动改用备用快捷键 {args.hotkey}（可用 --hotkey 换键）", flush=True)
     if not hook_ok and not args.hotkey:
         print("侧键和快捷键都不可用，无法继续。请加 --hotkey ctrl+alt+d 再试。", flush=True)
         return 2

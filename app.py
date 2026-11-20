@@ -11,6 +11,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
+from asr import AsrRouter, load_config
 from transcriber import DEFAULT_MODEL_DIR, OfflineTranscriber
 from webapp import JobManager, create_app
 
@@ -45,10 +46,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-browser", action="store_true", help="启动后不自动打开浏览器")
     parser.add_argument("--debug", action="store_true", help="使用 Flask 开发服务器并输出调试日志")
     parser.add_argument("--model", default=str(DEFAULT_MODEL_DIR), help="whisper-base 模型目录")
+    parser.add_argument("--asr", default="", choices=["", "auto", "local", "online"],
+                        help="识别引擎：local 离线 / online 云端 / auto 自动（默认按 config.json）")
+    parser.add_argument("--config", default=None, help="配置文件路径（默认 EXE 同目录的 config.json）")
     args = parser.parse_args(argv)
 
     model_dir = Path(args.model).resolve()
-    engine = OfflineTranscriber(model_dir)
+    config = load_config(args.config)
+    engine = AsrRouter(OfflineTranscriber(model_dir), config, mode=args.asr or None)
     manager = JobManager(engine, _workspace())
     server_holder: dict[str, object] = {}
 
@@ -65,9 +70,17 @@ def main(argv: list[str] | None = None) -> int:
     port = args.port or _free_port()
     url = f"http://127.0.0.1:{port}/"
 
+    info = engine.describe()
     print(BANNER)
     print(f"模型目录：{model_dir}")
-    print(f"模型状态：{'已就绪' if engine.model_ready else '不完整（请检查 models/whisper-base）'}")
+    print(
+        "识别引擎：{}（本地{} / 云端{}）".format(
+            info["mode"],
+            "就绪" if info["local_ready"] else "不可用",
+            ("已配置 " + (info["online_host"] or "")) if info["online_ready"] else "未配置",
+        )
+    )
+    print(f"可用状态：{'就绪' if engine.model_ready else '不可用（检查 models/ 或 config.json）'}")
     print(f"访问地址：{url}")
     print("关闭此窗口或按 Ctrl+C 结束程序。\n")
 

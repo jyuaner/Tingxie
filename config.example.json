@@ -1,0 +1,12 @@
+{
+  "mode": "auto",
+  "fallback": true,
+  "trigger": "x1",
+  "online": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "在这里填你的 API Key",
+    "model": "whisper-1",
+    "timeout": 60,
+    "send_language": true
+  }
+}

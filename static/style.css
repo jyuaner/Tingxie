@@ -377,6 +377,12 @@ h1 span {
   text-align: center;
   margin: 10px 0 0;
 }
+.engine-row {
+  border-top: 0;
+  padding-top: 12px;
+  margin-top: 0;
+}
+
 .language-row {
   border-top: 1px solid #edf0e9;
   padding-top: 19px;

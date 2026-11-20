@@ -39,7 +39,8 @@
 | 📊 进度可见 | 解码 → 语音检测 → 加载模型 → 逐段识别，实时百分比与阶段提示 |
 | 🧹 不留痕迹 | 临时音频在任务结束即删除；结果只存在内存中，退出即清空 |
 | 🔒 本机防护 | 仅监听 `127.0.0.1`，校验 Host / Origin / 一次性访问令牌，防止局域网访问与跨站调用 |
-| ⌨️ 全局听写 | 鼠标侧键一按开始、再按结束，识别结果直接粘贴到任意前台窗口（无需切窗口） |
+| ⌨️ 全局听写 | 任意鼠标键/键盘键/组合键一按开始、再按结束，识别结果直接粘贴到任意前台窗口 |
+| 🌐 双引擎 | 联网走云端 API（快、准），断网自动回退本机 CPU；只用离线也完全能跑 |
 
 ## 快速开始（普通用户）
 
@@ -50,7 +51,7 @@
 
 > 首次识别会加载模型，CPU 上需要几秒预热；之后的转换更快。
 
-## ⌨️ 全局听写：按一下侧键说话，文字直接上屏
+## ⌨️ 全局听写：按一下触发键说话，文字直接上屏
 
 不想切窗口、不想打字的时候用它：**按一下鼠标侧键开始录音，再说一遍，再按一下结束，1–2 秒后文字出现在你当前光标处**（微信、Word、IDE、浏览器输入框都行）。
 
@@ -59,15 +60,84 @@
 叮咚（升调）  →  麦克风录音（升调提示）  →  叮咚（降调）  →  文字自动粘贴进当前窗口
 ```
 
+### 触发键随便改（不再局限于侧键）
+
+```powershell
+Tingxie.exe --dictate                         # 默认：鼠标侧键 x1（后退键）
+Tingxie.exe --dictate --trigger x2            # 鼠标前进侧键
+Tingxie.exe --dictate --trigger middle        # 鼠标中键
+Tingxie.exe --dictate --trigger f9            # 键盘 F9
+Tingxie.exe --dictate --trigger ctrl+shift+d  # 任意组合键（推荐，不会误触）
+Tingxie.exe --dictate --trigger capslock      # 甚至 CapsLock
+Tingxie.exe --dictate --list-keys             # 列出所有可用键名
+```
+
+- `--trigger` 也可以写成 `--button` / `--key`，三个名字等价；
+- 组合键支持 `ctrl` / `alt` / `shift` / `win`；
+- 表里没有的键用虚拟键码：`--trigger vk:0x7B`（`--probe` 会把按键的 vk 打出来）；
+- 也可以写进 `config.json` 的 `"trigger": "ctrl+shift+d"`，以后双击启动脚本就生效；
+- 按键被钩子吃掉，不会漏进别的窗口；录音时按 `Esc` 取消。
+
+> ⚠️ 把单个字母（如 `--trigger d`）当触发键会让这个字母在全局失效；日常推荐用组合键或 F 区键。
+
+### 两种识别方式：联网 / 离线
+
+| 模式 | 走哪条路 | 适合 |
+| --- | --- | --- |
+| `local` | 本机 Whisper Base（CPU int8），音频不出本机 | 断网、隐私敏感、开会录音 |
+| `online` | 任意 OpenAI 兼容的 `/audio/transcriptions` 接口 | 有网、要更快更准 |
+| `auto`（默认） | 配了 key 就先用云端，失败（超时/401/无网）自动回退本地 | 日常用，两个都想要 |
+
+```powershell
+Tingxie.exe --dictate --asr local     # 强制离线
+Tingxie.exe --dictate --asr online    # 强制云端
+Tingxie.exe --dictate --asr auto      # 自动（默认）
+```
+
+云端配置：把 `config.example.json` 复制成 `config.json`（和 EXE 同目录），填三行就够：
+
+```json
+{
+  "mode": "auto",
+  "trigger": "ctrl+shift+d",
+  "online": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-你的key",
+    "model": "whisper-1"
+  }
+}
+```
+
+常见服务（都兼容 OpenAI 格式）：
+
+| 服务 | base_url | model 示例 |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | `whisper-1` / `gpt-4o-mini-transcribe` |
+| Groq | `https://api.groq.com/openai/v1` | `whisper-large-v3-turbo` |
+| SiliconFlow | `https://api.siliconflow.cn/v1` | `FunAudioLLM/SenseVoiceSmall` |
+| 自建网关 | `http://127.0.0.1:8000/v1` | 你自己的模型名 |
+
+也可以用环境变量，避免把 key 写进文件：
+
+```powershell
+$env:TINGXIE_API_KEY  = "sk-..."
+$env:TINGXIE_BASE_URL = "https://api.openai.com/v1"
+$env:TINGXIE_MODEL    = "whisper-1"
+$env:TINGXIE_MODE     = "auto"    # local / online / auto
+```
+
+> 🔐 联网模式下音频会发送到你配置的那个服务商；离线模式（`--asr local`）全程不出本机。
+> 网页版右上角同一行也有「识别方式」下拉框，可以逐个任务临时切。
+
 ### 怎么用
 
 1. 双击解压目录里的 **`听写-全局输入.cmd`**（等价于 `Tingxie.exe --dictate`）；
 2. 先按一次侧键试试：有升调提示音就是开始录音，再按一次即有降调音并开始识别；
 3. 文字会以「粘贴」的方式进到前台窗口，原剪贴板内容会自动还原。
 
-### 侧键没反应？
+### 按了没反应？
 
-不同鼠标的侧键可能发的是鼠标事件（XBUTTON1/XBUTTON2），也可能被厂商驱动改成了键盘键。先诊断 30 秒：
+先确认你的键到底发出了什么事件（侧键常被鼠标驱动改写成键盘键，组合键也可能被别的软件占用）。诊断 30 秒：
 
 ```powershell
 Tingxie.exe --dictate --probe
@@ -97,7 +167,10 @@ Tingxie.exe --dictate --selftest
 
 | 参数 | 作用 |
 | --- | --- |
-| `--button x1\|x2\|f9\|capslock…` | 触发键，默认 `x1`（鼠标后退侧键） |
+| `--trigger`（=`--button`/`--key`） | 触发键：`x1`/`x2`/`middle`/`f9`/`ctrl+shift+d`/`vk:0x7B`，默认 `x1` |
+| `--list-keys` | 列出所有可用键名 |
+| `--asr local\|online\|auto` | 识别引擎，默认按 `config.json` |
+| `--config PATH` | 指定配置文件 |
 | `--hotkey ctrl+alt+d` | 备用快捷键：不依赖鼠标钩子，钩子失效时用它 |
 | `--selftest` | 自检钩子是否可用（自己合成事件，2 秒出结果） |
 | `--probe` | 诊断：打印你按下的侧键/键盘键 |
@@ -165,7 +238,7 @@ python -m PyInstaller tingxie.spec --noconfirm
 ## 技术架构
 
 ```
-【全局听写】  dictation.py
+【全局听写】  dictation.py → asr.py（本地 / 云端自动择一）
 鼠标侧键(XBUTTON1/2) → WH_MOUSE_LL 钩子 → sounddevice 内存录音
        ↓ 再按一次
 transcriber.py 的 transcribe_array()  →  剪贴板 + Ctrl+V 粘贴进前台窗口
@@ -183,7 +256,7 @@ transcriber.py 的 transcribe_array()  →  剪贴板 + Ctrl+V 粘贴进前台�
 └───────────────▲──────────────────────────────────────┬───────────┘
                 │ 进度回调 progress/stage/text          │ 后台线程
 ┌───────────────┴──────────────────────────────────────▼───────────┐
-│  transcriber.py （文件与内存波形共用同一套识别流程）                 │
+│  transcriber.py（本地 Whisper） / asr.py 云端 API（可选）           │
 │  PyAV 解码 → 16 kHz 单声道 int16（硬上限 3600 s）                  │
 │  Silero VAD 切片 → faster-whisper Whisper Base（CPU / int8）      │
 └──────────────────────────────────────────────────────────────────┘
@@ -200,8 +273,8 @@ transcriber.py 的 transcribe_array()  →  剪贴板 + Ctrl+V 粘贴进前台�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/` | 单页界面（注入一次性 `X-App-Token`） |
-| GET | `/api/info` | 模型名、离线标记、上传上限、是否就绪、最近任务 |
-| POST | `/api/transcriptions` | `multipart/form-data`：`audio` 文件 + `language`（`zh`/`en`/`auto`），返回 `202 {id}` |
+| GET | `/api/info` | 模型名、引擎信息（`engines`）、上传上限、是否就绪、最近任务 |
+| POST | `/api/transcriptions` | `multipart/form-data`：`audio` + `language`（`zh`/`en`/`auto`）+ `engine`（`auto`/`local`/`online`，可省），返回 `202 {id}` |
 | GET | `/api/transcriptions/<id>` | 任务快照：`state`、`stage`、`progress`、`text`、`segments`、`duration`、`language`、`error` |
 | POST | `/api/shutdown` | 空闲时优雅退出本地服务 |
 
@@ -212,7 +285,9 @@ transcriber.py 的 transcribe_array()  →  剪贴板 + Ctrl+V 粘贴进前台�
 ```
 Tingxie/
 ├── app.py               # 启动器：选端口、起 Waitress、开浏览器（--dictate 走全局听写）
-├── dictation.py         # 全局听写：侧键钩子、内存录音、粘贴/键入上屏
+├── dictation.py         # 全局听写：触发键钩子（鼠标/键盘/组合键）、内存录音、粘贴/键入上屏
+├── asr.py               # 双引擎路由：本地 Whisper ↔ OpenAI 兼容的云端接口
+├── config.example.json  # 云端配置示例（复制成 config.json 再填 key）
 ├── webapp.py            # Flask 应用、安全校验、单任务队列
 ├── transcriber.py       # 音频解码 + Whisper 推理（文件与内存波形共用）
 ├── listen.cmd           # 双击即进全局听写模式的启动脚本
@@ -251,14 +326,17 @@ Tingxie/
 - 噪声、口音、专业术语仍会出错，重要内容请人工校对；
 - 结果只保存在内存，关闭程序即清空 —— 记得先导出；
 - 界面为单任务串行：一个任务跑完才能提交下一个；
-- 全局听写的上屏目标是**当前前台窗口**，管理员权限的窗口会因 UIPI 拒绝接收（文字会留在剪贴板）。
+- 全局听写的上屏目标是**当前前台窗口**，管理员权限的窗口会因 UIPI 拒绝接收（文字会留在剪贴板）；
+- 云端模式需要网络与可用的 API Key，按量计费由服务商决定；云端失败会回退本地（可在 config 里关掉 `fallback`）。
 
 ## 隐私说明
 
 - 推理全部在本机完成，程序没有任何外发网络的业务请求；
 - `HF_HUB_OFFLINE=1`，即使模型目录缺失也不会触发在线下载；
 - 上传的音频写入系统临时目录，任务结束（完成或失败）立即 `unlink`；
-- 服务只绑定 `127.0.0.1`，并通过一次性 token 拒绝非本页面发起的请求。
+- 服务只绑定 `127.0.0.1`，并通过一次性 token 拒绝非本页面发起的请求；
+- 只有你显式把 `mode` 设为 `online`（或 `auto` 且填了 key）时，音频才会发给你配置的云端服务商；`--asr local` 全程不出本机；
+- `config.json` 含 API Key，已在 `.gitignore` 中，请勿提交或分享。
 
 ## 常见问题
 
@@ -275,6 +353,10 @@ Tingxie/
 **全局听写：识别了但没进窗口？** 目标窗口若以管理员权限运行，Windows 会阻止普通进程注入（UIPI）；文字会留在剪贴板，手动 Ctrl+V。个别终端屏蔽 Ctrl+V 时可加 `--type` 逐字输入。
 
 **全局听写：两个窗口都开着会怎样？** 侧键会被先启动的那个独占，第二个实例会直接提示「已有一个听写实例在运行」并退出（单实例锁）。
+
+**云端模式报 401 / 400？** 检查 `config.json` 里的 `api_key` 与 `base_url`（要带 `/v1`）、`model` 是否是那个服务商支持的语音模型名；不同服务商的返回字段差异已做兼容（`text` / `data.text` / `segments`）。
+
+**云端和本地怎么选？** 日常用 `auto`：有 key 时走云端，网络抖动或额度用完就自动回退本地，不会丢话；开会/隐私场景用 `--asr local`。
 
 **全局听写：麦克风没声音？** Windows 设置 → 隐私和安全性 → 麦克风，打开「允许桌面应用访问麦克风」；`--devices` 列出设备后用 `--device N` 指定。
 

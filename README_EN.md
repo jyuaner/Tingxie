@@ -9,7 +9,8 @@ Tingxie (听写) is a small desktop tool for Windows 10/11 x64 that records from
 ## Features
 
 - **Record or import** — in-browser recording with playback before transcription, plus drag & drop for WAV / MP3 / M4A / MP4 / FLAC / OGG / WEBM / AAC / WMA / OPUS.
-- **Global dictation** — press a mouse side button, speak, press again: the transcript is pasted straight into whatever window has focus.
+- **Global dictation** — any mouse button, keyboard key or combo (default mouse side button): press to start, press again to stop, and the transcript is pasted into whatever window has focus.
+- **Two engines** — cloud API when online, local CPU Whisper when offline, with automatic fallback.
 - **Language control** — Chinese (Mandarin), English, or automatic detection.
 - **Editable results** — edit inline, copy to clipboard, export UTF-8 TXT (with BOM, so Notepad and Excel open it correctly).
 - **Visible progress** — decoding → voice activity detection → model loading → segment-by-segment progress with a real percentage.
@@ -23,7 +24,7 @@ Tingxie (听写) is a small desktop tool for Windows 10/11 x64 that records from
 3. Double-click `Tingxie.exe`; the browser opens the local UI automatically.
 4. Record or import → pick a language → transcribe → edit / copy / export.
 
-## Global dictation (side button)
+## Global dictation (custom hotkey)
 
 Type less: **press a mouse side button → speak → press again → the text lands at your cursor** about a second later (WeChat, Word, IDE, browser fields — anything that accepts a paste).
 
@@ -31,13 +32,55 @@ Type less: **press a mouse side button → speak → press again → the text la
 2. Press the side button once: rising beeps mean recording started; press again for the falling beeps and transcription;
 3. Text is injected with the clipboard + `Ctrl+V`, and your previous clipboard content is restored.
 
+### Custom trigger
+
+```powershell
+Tingxie.exe --dictate                         # default: mouse side button x1
+Tingxie.exe --dictate --trigger x2            # other side button
+Tingxie.exe --dictate --trigger middle        # middle click
+Tingxie.exe --dictate --trigger f9            # F9
+Tingxie.exe --dictate --trigger ctrl+shift+d  # any combo (recommended)
+Tingxie.exe --dictate --list-keys             # show every supported key name
+```
+
+`--button` and `--key` are aliases of `--trigger`. Unlisted keys can be addressed by virtual-key code: `--trigger vk:0x7B`. The trigger can also live in `config.json` as `"trigger": "ctrl+shift+d"`. The key event is swallowed, so it never reaches other windows; press `Esc` while recording to cancel.
+
+### Online vs offline
+
+| Mode | Path | When |
+| --- | --- | --- |
+| `local` | local Whisper Base (CPU int8), audio never leaves the machine | offline, privacy-sensitive |
+| `online` | any OpenAI-compatible `/audio/transcriptions` endpoint | online, faster/stronger |
+| `auto` (default) | cloud first when configured, automatic fallback to local | everyday use |
+
+```powershell
+Tingxie.exe --dictate --asr local     # force offline
+Tingxie.exe --dictate --asr online    # force cloud
+```
+
+Copy `config.example.json` to `config.json` next to the EXE:
+
+```json
+{
+  "mode": "auto",
+  "trigger": "ctrl+shift+d",
+  "online": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-your-key",
+    "model": "whisper-1"
+  }
+}
+```
+
+Works with OpenAI, Groq (`https://api.groq.com/openai/v1`), SiliconFlow, or your own gateway. Environment variables `TINGXIE_API_KEY`, `TINGXIE_BASE_URL`, `TINGXIE_MODEL`, `TINGXIE_MODE` override the file. In cloud mode the audio is sent to the provider you configured; `--asr local` keeps everything on the machine.
+
 **Button does nothing?** Run `Tingxie.exe --dictate --probe` and press the button once within 30 seconds:
 
 | Output | Use |
 | --- | --- |
-| `mouse: 侧键按下 XBUTTON1` | `--button x1` (default) |
-| `mouse: 侧键按下 XBUTTON2` | `--button x2` |
-| `key: vk=0x78` (F9) | `--button f9` |
+| `mouse: 侧键按下 XBUTTON1` | `--trigger x1` (default) |
+| `mouse: 侧键按下 XBUTTON2` | `--trigger x2` |
+| `key: vk=0x78` (F9) | `--trigger f9` |
 | nothing | the vendor driver swallowed it — remap it to a key or pick another trigger |
 
 For a hands-off check run `Tingxie.exe --dictate --selftest`: it synthesises a 1-pixel mouse move and reports whether the hook receives events (it never clicks or types into other windows). If it reports a failure, use a hotkey instead: `--dictate --hotkey ctrl+alt+d`. The daemon runs the same self-check at startup and switches to `ctrl+alt+d` automatically when the hook delivers nothing.

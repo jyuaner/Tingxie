@@ -85,7 +85,7 @@ class JobManager:
                 raise BusyError("任务正在处理中，请等待完成后再退出。")
             self._stopping = True
 
-    def submit(self, stream: BinaryIO, language: str, filename: str) -> str:
+    def submit(self, stream: BinaryIO, language: str, filename: str, engine: str | None = None) -> str:
         if language not in LANGUAGES:
             raise ValueError("语言仅支持中文（zh）、英语（en）或自动检测（auto）。")
         display_name = str(filename).replace("\\", "/").rsplit("/", 1)[-1]
@@ -137,10 +137,11 @@ class JobManager:
                     "language": language,
                     "error": None,
                     "filename": display_name[:255],
+                    "engine": engine or None,
                 }
             worker = threading.Thread(
                 target=self._run,
-                args=(job_id, path, language),
+                args=(job_id, path, language, engine),
                 name="offline-transcriber",
                 daemon=True,
             )
@@ -160,7 +161,7 @@ class JobManager:
                     )
             raise
 
-    def _run(self, job_id: str, path: Path, language: str) -> None:
+    def _run(self, job_id: str, path: Path, language: str, engine: str | None = None) -> None:
         result: dict | None = None
         error: str | None = None
 
@@ -178,7 +179,10 @@ class JobManager:
                 self._latest.update({"state": "running", "stage": "decoding"})
 
         try:
-            result = self.engine.transcribe(path, language, on_update)
+            if hasattr(self.engine, "transcribe_file"):
+                result = self.engine.transcribe_file(path, language, on_update, mode=engine)
+            else:  # 兼容只实现 transcribe 的旧引擎
+                result = self.engine.transcribe(path, language, on_update)
         except BaseException as exc:  # noqa: BLE001 - surfaced to the UI as text
             error = _failure_message(exc)
 
@@ -263,12 +267,21 @@ def create_app(manager: JobManager, shutdown_callback: Callable[[], None] | None
 
     @app.get("/api/info")
     def info():
+        engines = manager.engine.describe() if hasattr(manager.engine, "describe") else {}
+        online = bool(engines.get("online_ready"))
+        if engines.get("mode") == "online" and online:
+            model_label = f"云端 {(engines.get('online_model') or '')}".strip()
+        elif online and engines.get("mode") == "auto":
+            model_label = "自适应（云端优先 / 本地兜底）"
+        else:
+            model_label = "Whisper Base（本地）"
         return jsonify(
-            model="Whisper Base",
-            offline=True,
+            model=model_label,
+            offline=not online,
             max_upload_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
             max_audio_minutes=60,
             model_ready=manager.model_ready,
+            engines=engines,
             job=manager.latest_job(),
         )
 
@@ -278,8 +291,11 @@ def create_app(manager: JobManager, shutdown_callback: Callable[[], None] | None
         if upload is None or not upload.filename:
             return json_error("请选择音频文件或先完成录音。", 400)
         language = request.form.get("language", "auto")
+        engine = (request.form.get("engine") or "").strip().lower() or None
+        if engine not in (None, "auto", "local", "online"):
+            return json_error("识别方式仅支持 auto、local 或 online。", 400)
         try:
-            job_id = manager.submit(upload.stream, language, filename=upload.filename)
+            job_id = manager.submit(upload.stream, language, filename=upload.filename, engine=engine)
         except BusyError as exc:
             return json_error(str(exc), 409)
         except ModelNotReadyError as exc:

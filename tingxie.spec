@@ -40,6 +40,7 @@ hiddenimports = (
     + collect_submodules("ctranslate2")
     + ["onnxruntime", "av", "waitress", "sounddevice", "cffi"]
 )
+datas.append((str(ROOT / "config.example.json"), "config.example.json"))
 datas += collect_data_files("faster_whisper", include_py_files=False)
 
 a = Analysis(

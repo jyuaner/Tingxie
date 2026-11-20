@@ -51,6 +51,7 @@ function refreshControls() {
   $("audio-file").disabled = locked;
   $("remove-audio").disabled = locked;
   $("language").disabled = locked;
+  $("engine").disabled = locked;
   $("transcribe-button").disabled =
     !initialized ||
     shuttingDown ||
@@ -374,6 +375,7 @@ async function startTranscription() {
     const data = new FormData();
     data.append("audio", audioFile, audioFile.name);
     data.append("language", $("language").value);
+    data.append("engine", $("engine").value);
     const job = await api("/api/transcriptions", {
       method: "POST",
       body: data,
@@ -510,12 +512,24 @@ async function initialize() {
   try {
     const info = await api("/api/info");
     modelReady = info.model_ready;
+    const engines = info.engines || {};
+    if (engines.mode) $("engine").value = engines.mode;
+    let engineLabel;
+    if (engines.mode === "online") {
+      engineLabel = `云端 ${engines.online_model || ""} · ${engines.online_host || ""}`;
+    } else if (engines.mode === "auto" && engines.online_ready) {
+      engineLabel = `自动 · 云端(${engines.online_host || ""}) / 本地兜底`;
+    } else {
+      engineLabel = "Whisper Base · 本地离线";
+    }
     $("model-status").textContent = modelReady
-      ? `${info.model} · 离线模型已就绪`
-      : "本地模型不完整";
+      ? `${engineLabel} · 已就绪`
+      : "没有可用的识别引擎";
     if (!modelReady) {
       $("model-dot").classList.add("error");
-      showError("没有找到完整的离线模型。请完整解压离线包，不要只复制 EXE。");
+      showError(
+        "本地模型不完整，且云端未配置。请完整解压离线包，或在 config.json 里填写 online.api_key。",
+      );
     }
     if (info.job) {
       if (["queued", "running"].includes(info.job.state)) {
