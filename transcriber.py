@@ -160,9 +160,27 @@ class OfflineTranscriber:
         language: str,
         on_update: Callable[[dict], None] | None = None,
     ) -> dict:
+        """解码一个音频文件再识别（网页版的入口）。"""
         if language not in LANGUAGES:
             raise ValueError("语言仅支持中文（zh）、英语（en）或自动检测（auto）。")
         self.ensure_model_ready()
+        if on_update is not None:
+            on_update({"progress": 0, "stage": "decoding", "text": ""})
+        audio = decode_audio(Path(path))
+        return self.transcribe_array(audio, language, on_update, checked=True)
+
+    def transcribe_array(
+        self,
+        audio,
+        language: str,
+        on_update: Callable[[dict], None] | None = None,
+        checked: bool = False,
+    ) -> dict:
+        """识别已经解码好的单声道 16 kHz float32 波形（全局听写走这里，不用落盘）。"""
+        if not checked:
+            if language not in LANGUAGES:
+                raise ValueError("语言仅支持中文（zh）、英语（en）或自动检测（auto）。")
+            self.ensure_model_ready()
 
         segments: list[dict] = []
         text_parts: list[str] = []
@@ -178,8 +196,6 @@ class OfflineTranscriber:
                 }
             )
 
-        publish(0, "decoding")
-        audio = decode_audio(Path(path))
         duration = len(audio) / SAMPLE_RATE
         empty = {"text": "", "segments": [], "duration": duration, "language": language}
         if not len(audio):

@@ -33,6 +33,13 @@ def _workspace() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if "--dictate" in raw:
+        # 全局听写模式：侧键触发，识别结果直接上屏，不开浏览器
+        from dictation import main as dictation_main
+
+        return dictation_main([item for item in raw if item != "--dictate"])
+
     parser = argparse.ArgumentParser(description="听写 · 本地离线语音转文字")
     parser.add_argument("--port", type=int, default=0, help="固定端口，默认自动选择空闲端口")
     parser.add_argument("--no-browser", action="store_true", help="启动后不自动打开浏览器")

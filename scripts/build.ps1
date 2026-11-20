@@ -50,6 +50,13 @@ try {
 
     $dist = Join-Path $root "dist\Tingxie-windows-x64"
     if (-not (Test-Path (Join-Path $dist "Tingxie.exe"))) { throw "未找到 dist\Tingxie-windows-x64\Tingxie.exe" }
+
+    # PyInstaller 6 会把 add-data 放进 _internal，启动脚本必须落在 dist 根目录
+    $launcher = Join-Path $root "听写-全局输入.cmd"
+    if (Test-Path $launcher) {
+        Copy-Item $launcher $dist -Force
+        Remove-Item (Join-Path $dist "_internal\听写-全局输入.cmd") -Force -ErrorAction SilentlyContinue
+    }
     Write-Host "产物：$dist"
 
     if (-not $SkipZip) {
