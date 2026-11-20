@@ -21,8 +21,8 @@ MAX_AUDIO_SECONDS = 60 * 60
 LANGUAGES = frozenset({"zh", "en", "auto"})
 REQUIRED_MODEL_FILES = ("model.bin", "config.json", "tokenizer.json", "vocabulary.txt")
 
-#: 中文提示词，逼模型输出简体中文并补全标点。
-_ZH_PROMPT = "以下是普通话内容，请使用简体中文和标点符号。"
+#: 中文提示词，逼模型输出简体中文并补全标点（Whisper 对短句的标点很不稳）
+_PROMPTS = {"zh": "以下是普通话内容，请使用简体中文和标点符号。"}
 
 
 def _bundle_root() -> Path:
@@ -160,9 +160,9 @@ class OfflineTranscriber:
         language: str,
         on_update: Callable[[dict], None] | None = None,
     ) -> dict:
-        """解码一个音频文件再识别（网页版的入口）。"""
+        """解码一个音频文件再识别（文件/测试入口；麦克风走 transcribe_array）。"""
         if language not in LANGUAGES:
-            raise ValueError("语言仅支持中文（zh）、英语（en）或自动检测（auto）。")
+            raise ValueError("语言仅支持中文（zh）、英文（en）或自动检测（auto）。")
         self.ensure_model_ready()
         if on_update is not None:
             on_update({"progress": 0, "stage": "decoding", "text": ""})
@@ -179,7 +179,7 @@ class OfflineTranscriber:
         """识别已经解码好的单声道 16 kHz float32 波形（全局听写走这里，不用落盘）。"""
         if not checked:
             if language not in LANGUAGES:
-                raise ValueError("语言仅支持中文（zh）、英语（en）或自动检测（auto）。")
+                raise ValueError("语言仅支持中文（zh）、英文（en）或自动检测（auto）。")
             self.ensure_model_ready()
 
         segments: list[dict] = []
@@ -223,7 +223,7 @@ class OfflineTranscriber:
             language=None if language == "auto" else language,
             beam_size=3,
             condition_on_previous_text=False,
-            initial_prompt=_ZH_PROMPT if language == "zh" else None,
+            initial_prompt=_PROMPTS.get(language) if language != "auto" else None,
             vad_filter=True,
             vad_parameters=vad_options,
         )

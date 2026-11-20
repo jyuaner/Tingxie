@@ -1,100 +1,101 @@
 # 听写 · Tingxie
 
-> 让声音，成为文字。一款**完全离线**的 Windows 本地语音转文字工具 —— 模型与运行环境全部内置，首次使用也不需要联网。
+> 按一下键，说话就变成文字。Windows 全局语音输入，识别在本机 CPU 或你配置的云端完成。
 
 <p align="left">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-147d68" />
-  <img alt="offline" src="https://img.shields.io/badge/network-100%25%20offline-147d68" />
-  <img alt="engine" src="https://img.shields.io/badge/engine-faster--whisper%20base-147d68" />
+  <img alt="hotkey" src="https://img.shields.io/badge/trigger-任意键%20%2F%20鼠标侧键-147d68" />
+  <img alt="offline" src="https://img.shields.io/badge/mode-本地离线%20%2F%20云端-147d68" />
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue" />
-</p>
-
-![听写主界面](docs/images/main.png)
-
-<p align="center">
-  <img src="docs/images/upload.png" width="49%" alt="导入音频并试听" />
-  <img src="docs/images/empty.png" width="49%" alt="空状态界面" />
 </p>
 
 ---
 
 ## 这是什么
 
-**听写**是一款「双击就能用」的离线语音转文字小工具：录一段话，或者拖进一个音频文件，几秒到几分钟后拿到可编辑的文字。
+一个常驻后台的听写小工具：**按下你绑定的键开始录音，再按一下结束，1–2 秒后文字出现在当前光标处** —— 微信、Word、IDE、浏览器输入框，都不用切窗口。
 
-- 音频**不上传**任何云端，识别在本机 CPU 上完成；
-- 不需要账号、不需要 API Key、不需要显卡；
-- 解压后双击 `Tingxie.exe`，浏览器里操作，界面像本地应用。
+没有网页界面、不开端口、不装浏览器插件：解压后双击 `听写-全局输入.cmd`，它就一直在后台等你按键。
 
-适合课堂录音整理、会议记录、口述笔记、采访素材转写等场景。
+> v1.3.0 起，原来的浏览器版（Flask + Waitress + 网页界面）已经整体移除，只保留快捷键输入。
 
 ## 功能
 
 | 能力 | 说明 |
 | --- | --- |
-| 🎙 麦克风录音 | 浏览器内录音，停止后可先试听，再决定是否转写 |
-| 📂 导入音频 | 支持 WAV / MP3 / M4A / MP4 / FLAC / OGG / WEBM / AAC / WMA / OPUS |
-| 🌐 语言识别 | 中文（普通话）、英语，或交给模型自动检测 |
-| ✍️ 结果处理 | 文字可编辑、复制、导出 UTF-8 TXT（带 BOM，Excel/记事本不乱码） |
-| 📊 进度可见 | 解码 → 语音检测 → 加载模型 → 逐段识别，实时百分比与阶段提示 |
-| 🧹 不留痕迹 | 临时音频在任务结束即删除；结果只存在内存中，退出即清空 |
-| 🔒 本机防护 | 仅监听 `127.0.0.1`，校验 Host / Origin / 一次性访问令牌，防止局域网访问与跨站调用 |
-| ⌨️ 全局听写 | 任意鼠标键/键盘键/组合键一按开始、再按结束，识别结果直接粘贴到任意前台窗口 |
-| 🌐 双引擎 | 联网走云端 API（快、准），断网自动回退本机 CPU；只用离线也完全能跑 |
+| ⌨️ 任意触发键 | 鼠标侧键 / 中键 / 键盘任意键 / `ctrl+shift+d` 这类组合键 / 虚拟键码 |
+| 🗣 中英双语 | 中文（普通话）、英文，或自动检测 |
+| 🖥 双引擎 | 本地 Whisper Base（CPU，完全离线）或云端 API（更快更准），可自动切换与回退 |
+| ✍️ 直接上屏 | 剪贴板 + `Ctrl+V` 注入当前前台窗口，识别后自动还原你原来的剪贴板 |
+| 🔔 反馈明确 | 开始/结束/失败各有提示音；录音时按 `Esc` 取消；控制台打印耗时与字数 |
+| 🧹 不留痕 | 音频只在内存里，不落盘；不写日志文件 |
+| 🔒 单实例 | 第二个实例会提示并退出，避免两个进程抢同一个键 |
+| 🛡 可控隐私 | `--asr local` 时音频不出本机；`config.json` 里的 Key 不进版本库 |
 
-## 快速开始（普通用户）
+## 快速开始
 
 1. 在 [Releases](../../releases) 下载 `Tingxie-Windows-x64-offline.zip`（约 250 MB）；
-2. **完整解压**到任意目录（不要只把 EXE 拖出来，`_internal` 里是模型和运行环境）；
-3. 双击 `Tingxie.exe`，程序会自动打开浏览器页面；
-4. 录音或导入音频 → 选语言 → 开始转写 → 编辑/复制/导出。
+2. **完整解压**到任意目录（`_internal/` 里是模型和运行环境）；
+3. 双击 **`听写-全局输入.cmd`**，窗口里会打印当前触发键与引擎状态；
+4. 按一下鼠标侧键 → 说话 → 再按一下 → 文字出现在光标处；
+5. 录音时想反悔，按 `Esc`。
 
-> 首次识别会加载模型，CPU 上需要几秒预热；之后的转换更快。
+窗口最小化就行，别关；关了就等于退出。
 
-## ⌨️ 全局听写：按一下触发键说话，文字直接上屏
-
-不想切窗口、不想打字的时候用它：**按一下鼠标侧键开始录音，再说一遍，再按一下结束，1–2 秒后文字出现在你当前光标处**（微信、Word、IDE、浏览器输入框都行）。
-
-```
-按侧键 ↓                 说话               按侧键 ↓            1–2 秒后
-叮咚（升调）  →  麦克风录音（升调提示）  →  叮咚（降调）  →  文字自动粘贴进当前窗口
-```
-
-### 触发键随便改（不再局限于侧键）
+### 按键没反应？
 
 ```powershell
-Tingxie.exe --dictate                         # 默认：鼠标侧键 x1（后退键）
-Tingxie.exe --dictate --trigger x2            # 鼠标前进侧键
-Tingxie.exe --dictate --trigger middle        # 鼠标中键
-Tingxie.exe --dictate --trigger f9            # 键盘 F9
-Tingxie.exe --dictate --trigger ctrl+shift+d  # 任意组合键（推荐，不会误触）
-Tingxie.exe --dictate --trigger capslock      # 甚至 CapsLock
-Tingxie.exe --dictate --list-keys             # 列出所有可用键名
+Tingxie.exe --selftest              # 自检：自己合成事件，2 秒告诉你钩子能不能收到（不动你的鼠标）
+Tingxie.exe --probe                 # 30 秒内按一下你的键，打印它发的是 XBUTTON1/2 还是某个键盘键
+Tingxie.exe --list-keys             # 列出所有可用键名
+Tingxie.exe --trigger ctrl+shift+d  # 换个键试试
 ```
 
-- `--trigger` 也可以写成 `--button` / `--key`，三个名字等价；
-- 组合键支持 `ctrl` / `alt` / `shift` / `win`；
-- 表里没有的键用虚拟键码：`--trigger vk:0x7B`（`--probe` 会把按键的 vk 打出来）；
-- 也可以写进 `config.json` 的 `"trigger": "ctrl+shift+d"`，以后双击启动脚本就生效；
-- 按键被钩子吃掉，不会漏进别的窗口；录音时按 `Esc` 取消。
+启动时也会自动自检：钩子安装失败或收不到事件，会自动改用 `ctrl+alt+d` 并提示，不会直接退出。
 
-> ⚠️ 把单个字母（如 `--trigger d`）当触发键会让这个字母在全局失效；日常推荐用组合键或 F 区键。
+## 触发键
 
-### 两种识别方式：联网 / 离线
+```powershell
+听写-全局输入.cmd                              # 默认：鼠标侧键 x1（后退键）
+听写-全局输入.cmd --trigger x2                 # 另一个侧键
+听写-全局输入.cmd --trigger middle             # 鼠标中键
+听写-全局输入.cmd --trigger f9                 # 键盘 F9
+听写-全局输入.cmd --trigger ctrl+shift+d       # 任意组合键（推荐，不易误触）
+听写-全局输入.cmd --trigger vk:0x7B            # 直接写虚拟键码
+```
+
+- `--button` / `--key` 都是 `--trigger` 的别名；
+- 修饰键支持 `ctrl` / `alt` / `shift` / `win`；
+- 按下的是哪个键，事件就被钩子吃掉，不会漏进别的窗口（浏览器的「后退」也不会被触发）；
+- 也可以写进 `config.json` 的 `"trigger": "ctrl+shift+d"`，之后双击脚本就生效。
+
+> ⚠️ 把单个字母（如 `--trigger d`）当触发键会让这个字母全局失效，日常建议用组合键或 F 区键。
+
+## 语言
+
+```powershell
+听写-全局输入.cmd --language zh    # 中文（默认）
+听写-全局输入.cmd --language en    # 英文
+听写-全局输入.cmd --language auto  # 自动检测
+```
+
+中文会额外注入「请使用简体中文和标点符号」的提示词，输出带标点的简体中文；英文与自动检测不加提示词。
+
+## 两种识别方式：离线 / 云端
 
 | 模式 | 走哪条路 | 适合 |
 | --- | --- | --- |
-| `local` | 本机 Whisper Base（CPU int8），音频不出本机 | 断网、隐私敏感、开会录音 |
-| `online` | 任意 OpenAI 兼容的 `/audio/transcriptions` 接口 | 有网、要更快更准 |
-| `auto`（默认） | 配了 key 就先用云端，失败（超时/401/无网）自动回退本地 | 日常用，两个都想要 |
+| `local` | 本机 Whisper Base（CPU int8），音频不出本机 | 断网、隐私敏感、开会 |
+| `online` | 任意 OpenAI 兼容的 `/audio/transcriptions` 接口 | 有网，要更快更准 |
+| `auto`（默认） | 配了 Key 就先走云端，超时/401/断网自动回退本地 | 日常使用 |
 
 ```powershell
-Tingxie.exe --dictate --asr local     # 强制离线
-Tingxie.exe --dictate --asr online    # 强制云端
-Tingxie.exe --dictate --asr auto      # 自动（默认）
+听写-全局输入.cmd --asr local     # 强制离线
+听写-全局输入.cmd --asr online    # 强制云端
+听写-全局输入.cmd --asr auto      # 自动（默认）
 ```
 
-云端配置：把 `config.example.json` 复制成 `config.json`（和 EXE 同目录），填三行就够：
+云端配置：把 `config.example.json` 复制成 `config.json`（和 EXE 同目录），填三行即可：
 
 ```json
 {
@@ -108,16 +109,16 @@ Tingxie.exe --dictate --asr auto      # 自动（默认）
 }
 ```
 
-常见服务（都兼容 OpenAI 格式）：
+兼容的服务（都支持 OpenAI 的语音转写格式）：
 
 | 服务 | base_url | model 示例 |
 | --- | --- | --- |
 | OpenAI | `https://api.openai.com/v1` | `whisper-1` / `gpt-4o-mini-transcribe` |
 | Groq | `https://api.groq.com/openai/v1` | `whisper-large-v3-turbo` |
 | SiliconFlow | `https://api.siliconflow.cn/v1` | `FunAudioLLM/SenseVoiceSmall` |
-| 自建网关 | `http://127.0.0.1:8000/v1` | 你自己的模型名 |
+| 自建网关 | `http://127.0.0.1:8000/v1` | 你的模型名 |
 
-也可以用环境变量，避免把 key 写进文件：
+不想把 Key 写进文件，用环境变量：
 
 ```powershell
 $env:TINGXIE_API_KEY  = "sk-..."
@@ -126,73 +127,8 @@ $env:TINGXIE_MODEL    = "whisper-1"
 $env:TINGXIE_MODE     = "auto"    # local / online / auto
 ```
 
-> 🔐 联网模式下音频会发送到你配置的那个服务商；离线模式（`--asr local`）全程不出本机。
-> 网页版右上角同一行也有「识别方式」下拉框，可以逐个任务临时切。
-
-### 怎么用
-
-1. 双击解压目录里的 **`听写-全局输入.cmd`**（等价于 `Tingxie.exe --dictate`）；
-2. 先按一次侧键试试：有升调提示音就是开始录音，再按一次即有降调音并开始识别；
-3. 文字会以「粘贴」的方式进到前台窗口，原剪贴板内容会自动还原。
-
-### 按了没反应？
-
-先确认你的键到底发出了什么事件（侧键常被鼠标驱动改写成键盘键，组合键也可能被别的软件占用）。诊断 30 秒：
-
-```powershell
-Tingxie.exe --dictate --probe
-```
-
-30 秒内按一下你的侧键，看输出的那一行：
-
-| 看到 | 就用 |
-| --- | --- |
-| `mouse: 侧键按下 XBUTTON1` | `--button x1`（默认） |
-| `mouse: 侧键按下 XBUTTON2` | `--button x2` |
-| `key: vk=0x78`（例：F9） | `--button f9` |
-| 什么都没打印 | 侧键被厂商驱动拦走了，改用键盘键，或先在鼠标驱动里把侧键映射成某个键 |
-
-再不确定就跑一次**自检**（它自己合成事件，不动你的鼠标、不会点到别的窗口）：
-
-```powershell
-Tingxie.exe --dictate --selftest
-```
-
-- 输出「自检通过」→ 钩子在这台机器上可用，侧键方案没问题；
-- 输出「自检失败」→ 改用备用快捷键：`Tingxie.exe --dictate --hotkey ctrl+alt+d`。
-
-程序每次启动也会做同样的自检，若发现钩子收不到事件，会**自动切到 `ctrl+alt+d`** 并在窗口里提示。
-
-### 常用参数
-
-| 参数 | 作用 |
-| --- | --- |
-| `--trigger`（=`--button`/`--key`） | 触发键：`x1`/`x2`/`middle`/`f9`/`ctrl+shift+d`/`vk:0x7B`，默认 `x1` |
-| `--list-keys` | 列出所有可用键名 |
-| `--asr local\|online\|auto` | 识别引擎，默认按 `config.json` |
-| `--config PATH` | 指定配置文件 |
-| `--hotkey ctrl+alt+d` | 备用快捷键：不依赖鼠标钩子，钩子失效时用它 |
-| `--selftest` | 自检钩子是否可用（自己合成事件，2 秒出结果） |
-| `--probe` | 诊断：打印你按下的侧键/键盘键 |
-| `--debug-events` | 打印钩子收到的每个侧键事件（含 injected 标记） |
-| `--language zh\|en\|auto` | 识别语言，默认 `zh` |
-| `--type` | 逐字输入而不是粘贴（少数屏蔽 Ctrl+V 的终端用它） |
-| `--keep-clipboard` | 识别后把文字留在剪贴板，方便再贴一次 |
-| `--no-paste` | 只打印识别结果，不往窗口里注入任何东西 |
-| `--device N` | 指定麦克风，`--devices` 列出所有输入设备 |
-| `--max-seconds 120` | 单次录音上限，默认 120 秒 |
-| `--silent` | 关闭提示音 |
-
-录音中按 **Esc** 取消本次录音；关闭控制台窗口即退出听写模式。
-
-### 为什么这样设计
-
-- **不落盘**：Audio 从麦克风直接进内存（16 kHz 单声道），识别完即丢弃，比网页版还少一次临时文件；
-- **吃掉侧键事件**：钩子返回 1，浏览器不会因为「后退键」而翻页；
-- **粘贴而不是模拟打字**：中文长句用剪贴板最快、最稳，且支持撤销（Ctrl+Z）；
-- **只在本机**：和网页版共用同一个 `transcriber.py`，没有任何网络请求。
-
-> 局限：粘贴目标是**当前前台窗口**，如果前台是管理员权限的程序（任务管理器、以管理员身份运行的终端），Windows 的 UIPI 会拒绝普通进程注入，此时文字会留在剪贴板里，手动 Ctrl+V 即可。
+> 🔐 `online` / `auto` 且配了 Key 时，音频会发送到你配置的服务商；`--asr local` 全程不出本机。
+> `config.json` 含密钥，已在 `.gitignore` 中，请勿提交或分享。
 
 ## 从源码运行
 
@@ -204,177 +140,121 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 
-# 把 Whisper Base（faster-whisper / CTranslate2 格式）放进 models/whisper-base/
-python scripts/fetch_model.py
-
-python app.py            # 网页版：默认自动选空闲端口并打开浏览器
-python app.py --port 8722 --no-browser --debug
-python dictation.py     # 全局听写：侧键触发，结果自动上屏
-python dictation.py --probe   # 不确定侧键发什么时先用诊断模式
+python scripts/fetch_model.py     # 一次性下载 whisper-base（也可只用云端，跳过这步）
+python app.py                     # 就是全局听写
+python app.py --list-keys         # 看可用键名
 ```
 
-`models/whisper-base/` 需要四个文件：
+`models/whisper-base/` 需要四个文件：`model.bin`、`config.json`、`tokenizer.json`、`vocabulary.txt`（详见 [models/README.md](models/README.md)）。
 
-```
-models/whisper-base/
-├── model.bin          # CTranslate2 权重（int8 也可）
-├── config.json
-├── tokenizer.json
-└── vocabulary.txt
-```
-
-`scripts/fetch_model.py` 从 `Systran/faster-whisper-base` 下载并放到该目录（仅首次运行需要联网，之后程序本身完全离线）。
-
-## 打包为离线单目录 EXE
+## 打包
 
 ```powershell
-python -m pip install pyinstaller
 python -m PyInstaller tingxie.spec --noconfirm
+# 或者一步到位（含压缩与 SHA256）：
+pwsh -File scripts/build.ps1
 ```
 
-产物在 `dist/Tingxie-windows-x64/`：`Tingxie.exe` + `_internal/`（含 `models/whisper-base`、`static/`、`templates/`、`sounddevice` 的 PortAudio DLL）以及 `听写-全局输入.cmd`。
-把这个目录整体压缩即得到可分发离线包。`scripts/build.ps1` 封装了上面两步。
-
-## 技术架构
+产物 `dist/Tingxie-windows-x64/`：
 
 ```
-【全局听写】  dictation.py → asr.py（本地 / 云端自动择一）
-鼠标侧键(XBUTTON1/2) → WH_MOUSE_LL 钩子 → sounddevice 内存录音
-       ↓ 再按一次
-transcriber.py 的 transcribe_array()  →  剪贴板 + Ctrl+V 粘贴进前台窗口
-（Esc 取消 · 提示音反馈 · 吃掉侧键事件避免浏览器后退）
-
-【网页版】
-┌───────────────────────── 浏览器（本机） ─────────────────────────┐
-│  templates/index.html + static/app.js + core.mjs + style.css     │
-│  录音(MediaRecorder) · 拖拽导入 · 编辑/复制/导出 · 轮询进度        │
-└───────────────▲──────────────────────────────────────┬───────────┘
-                │ fetch + X-App-Token                  │ multipart 音频
-┌───────────────┴──────────────────────────────────────▼───────────┐
-│  Waitress（127.0.0.1，随机端口）  ←  Flask  webapp.py            │
-│  Host/Origin 校验 · CSP · 201 MiB 请求上限 · 单任务队列(JobManager)│
-└───────────────▲──────────────────────────────────────┬───────────┘
-                │ 进度回调 progress/stage/text          │ 后台线程
-┌───────────────┴──────────────────────────────────────▼───────────┐
-│  transcriber.py（本地 Whisper） / asr.py 云端 API（可选）           │
-│  PyAV 解码 → 16 kHz 单声道 int16（硬上限 3600 s）                  │
-│  Silero VAD 切片 → faster-whisper Whisper Base（CPU / int8）      │
-└──────────────────────────────────────────────────────────────────┘
+Tingxie.exe                # 主程序（双击即听写）
+听写-全局输入.cmd            # 带提示的启动脚本，参数直接透传
+config.example.json        # 云端配置示例
+_internal/                 # 模型 + Python 运行时 + PortAudio
 ```
 
-- **前端**：原生 HTML/CSS/ES Module，无构建步骤，无框架依赖。
-- **后端**：Flask + Waitress（生产级 WSGI，多线程），单任务队列，结果驻留内存。
-- **全局听写**：Win32 低级鼠标/键盘钩子（`ctypes`，无第三方钩子库）+ PortAudio 内存录音；上屏用剪贴板 + `SendInput` 注入，剪贴板内容会自动还原。
-- **识别**：`faster-whisper` + CTranslate2，`device="cpu"`、`compute_type="int8"`、`cpu_threads=min(4, cpu_count)`；开启 VAD 过滤与 `beam_size=3`，中文额外注入简体标点提示词。
-- **打包**：PyInstaller onedir，模型、静态资源与 PortAudio DLL 一并收集。
+## 架构
 
-### HTTP 接口
+```
+按键（鼠标侧键 / 键盘 / 组合键）
+   │  WH_MOUSE_LL / WH_KEYBOARD_LL 低级钩子（ctypes，无第三方钩子库）
+   ▼
+dictation.py  ── 提示音、Esc 取消、单实例互斥
+   │  内存录音（PortAudio，16 kHz 单声道；声卡只支持 48 kHz 时自动重采样）
+   ▼
+asr.py  ── auto / local / online 路由，失败自动回退
+   ├─ local → transcriber.py：Silero VAD → faster-whisper Whisper Base（CPU int8）
+   └─ online → OpenAI 兼容 /audio/transcriptions（纯 urllib）
+   ▼
+剪贴板 + SendInput 注入当前前台窗口（可选 --type 逐字输入）
+```
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/` | 单页界面（注入一次性 `X-App-Token`） |
-| GET | `/api/info` | 模型名、引擎信息（`engines`）、上传上限、是否就绪、最近任务 |
-| POST | `/api/transcriptions` | `multipart/form-data`：`audio` + `language`（`zh`/`en`/`auto`）+ `engine`（`auto`/`local`/`online`，可省），返回 `202 {id}` |
-| GET | `/api/transcriptions/<id>` | 任务快照：`state`、`stage`、`progress`、`text`、`segments`、`duration`、`language`、`error` |
-| POST | `/api/shutdown` | 空闲时优雅退出本地服务 |
-
-错误统一为 `{"error": "..."}`；状态码覆盖 `400 / 403 / 404 / 409 / 413 / 503`。
+- 钩子：`ctypes` 直接调用 Win32，不引入第三方钩子库；按键事件被吞掉，避免浏览器后退；
+- 音频：只在内存里流转，识别完即丢弃，不写临时文件；
+- 上屏：剪贴板方式对中文标点最稳，并会在 0.35 秒后还原你原来的剪贴板。
 
 ## 目录结构
 
 ```
 Tingxie/
-├── app.py               # 启动器：选端口、起 Waitress、开浏览器（--dictate 走全局听写）
-├── dictation.py         # 全局听写：触发键钩子（鼠标/键盘/组合键）、内存录音、粘贴/键入上屏
-├── asr.py               # 双引擎路由：本地 Whisper ↔ OpenAI 兼容的云端接口
-├── config.example.json  # 云端配置示例（复制成 config.json 再填 key）
-├── webapp.py            # Flask 应用、安全校验、单任务队列
-├── transcriber.py       # 音频解码 + Whisper 推理（文件与内存波形共用）
-├── listen.cmd           # 双击即进全局听写模式的启动脚本
-├── templates/index.html # 界面结构
-├── static/
-│   ├── app.js           # 交互逻辑（录音、上传、轮询、导出）
-│   ├── core.mjs         # 纯函数：校验、时间格式化、字数统计
-│   ├── style.css        # 设计系统与动效
-│   └── favicon.svg
-├── models/              # 放置 whisper-base（不随仓库分发权重）
+├── app.py                 # 唯一入口，转给 dictation.main
+├── dictation.py           # 触发键钩子、录音、提示音、上屏
+├── asr.py                 # 本地/云端双引擎路由 + 配置文件
+├── transcriber.py         # PyAV 解码 + Whisper 推理（内存波形直达）
+├── config.example.json    # 云端配置示例（复制成 config.json）
+├── 听写-全局输入.cmd        # 双击即用的启动脚本
+├── models/                # whisper-base 模型（权重不入库）
 ├── scripts/
-│   ├── fetch_model.py   # 下载并校验模型文件
-│   └── build.ps1        # 一键打包离线包
-├── tingxie.spec         # PyInstaller 配置
-├── requirements.txt
-└── docs/images/
+│   ├── fetch_model.py     # 下载并校验模型
+│   └── build.ps1          # 一键打包 + 压缩
+├── tingxie.spec           # PyInstaller 配置
+└── requirements.txt
 ```
 
-## 性能参考（CPU，无独显）
+## 性能参考
 
-| 机器 | 示例 | 10 分钟音频耗时 |
-| --- | --- | --- |
-| i5-1135G7 (4 线程) | whisper-base int8 | ≈ 1.5–2.5 分钟 |
-| R5-5600U (4 线程) | whisper-base int8 | ≈ 1.5–2.5 分钟 |
-| 老款 i5-8250U | whisper-base int8 | ≈ 3–5 分钟 |
-| 低功耗赛扬/奔腾 | — | 明显更慢，长音频建议拆分 |
+| 场景 | 参考耗时 |
+| --- | --- |
+| 本地 · 5 秒短句 | 约 0.6–1.2 s |
+| 本地 · 30 秒段落 | 约 3–6 s |
+| 云端 · 5–30 秒 | 主要取决于网络往返，通常 1–3 s |
 
-> 实测值随音频内容、语音密度与后台负载波动，仅供参考。VAD 会跳过静音段，静音越多越快。
+首次识别要加载模型（CPU 上约 1–5 秒预热），之后同一进程内复用。
 
 ## 已知限制
 
-- 仅提供 **Windows 10/11 64 位** 构建，老旧 CPU 是否兼容取决于指令集（AVX2 通常更稳）；
-- 单个文件上限 **200 MB / 60 分钟**，超出会被前端与后端同时拦截；
-- **录完再转写**，不是实时流式识别（全局听写也是「说完再按一下」，停顿后才有字）；
-- 没有说话人分离、没有自动摘要、没有标点/断句模型二次校正；
-- 噪声、口音、专业术语仍会出错，重要内容请人工校对；
-- 结果只保存在内存，关闭程序即清空 —— 记得先导出；
-- 界面为单任务串行：一个任务跑完才能提交下一个；
-- 全局听写的上屏目标是**当前前台窗口**，管理员权限的窗口会因 UIPI 拒绝接收（文字会留在剪贴板）；
-- 云端模式需要网络与可用的 API Key，按量计费由服务商决定；云端失败会回退本地（可在 config 里关掉 `fallback`）。
+- 仅 Windows 10/11 64 位；老旧 CPU 是否兼容取决于指令集（AVX2 更稳）；
+- 说话时不要按着触发键不放：是**按一下开始、再按一下结束**，不是对讲机；
+- 说了才出字，不是边说边出字（无流式）；
+- 上屏目标是**当前前台窗口**；管理员权限的窗口会因 Windows UIPI 拒绝接收，文字会留在剪贴板里，手动 `Ctrl+V`；
+- 少数终端屏蔽 `Ctrl+V` 时可加 `--type` 逐字输入；
+- 同时只能跑一个实例；关闭控制台窗口即退出；
+- 噪声、口音、专业术语仍会出错，重要内容请核对。
 
-## 隐私说明
+## 隐私
 
-- 推理全部在本机完成，程序没有任何外发网络的业务请求；
-- `HF_HUB_OFFLINE=1`，即使模型目录缺失也不会触发在线下载；
-- 上传的音频写入系统临时目录，任务结束（完成或失败）立即 `unlink`；
-- 服务只绑定 `127.0.0.1`，并通过一次性 token 拒绝非本页面发起的请求；
-- 只有你显式把 `mode` 设为 `online`（或 `auto` 且填了 key）时，音频才会发给你配置的云端服务商；`--asr local` 全程不出本机；
-- `config.json` 含 API Key，已在 `.gitignore` 中，请勿提交或分享。
+- `--asr local`：识别全在本机，程序没有任何外发请求；
+- `HF_HUB_OFFLINE=1`、`local_files_only=True`：模型缺失时报错，不会偷偷联网下载；
+- 录音只在内存，识别结束即释放，不写磁盘；
+- `online` / `auto` 且配置了 Key 时，音频会按你的配置发往对应服务商（计费与数据策略由服务商决定）；
+- `config.json` 已在 `.gitignore` 中。
 
 ## 常见问题
 
-**双击后浏览器没打开？** 看控制台窗口打印的地址，手动访问 `http://127.0.0.1:<端口>/`。端口每次启动随机，避免冲突。
+**按了没反应？** 依次跑 `--selftest`、`--probe`、`--list-keys`；钩子被安全软件拦时会自动提示并改用 `ctrl+alt+d`。
 
-**提示「离线模型不完整」？** 解压不完整。请完整解压 zip，确认 `_internal/models/whisper-base/` 下四个文件齐全（`model.bin` 约 138 MB）。
+**识别了但没进窗口？** 前台窗口是管理员权限的（任务管理器、管理员终端）会被 UIPI 拦截 —— 文字已在剪贴板，手动 `Ctrl+V`。
 
-**提示「已有任务正在处理」？** 单任务队列，等当前任务结束或重启程序。
+**云端报 401 / 400？** 检查 `base_url`（要带 `/v1`）、`api_key`、`model` 是否为该服务商支持的语音模型名。
 
-**转写结果为空？** 程序会先做语音活动检测，音量过低/纯静音会被判定为无语音。检查系统输入设备、调高录音音量。
+**麦克风没声音？** Windows 设置 → 隐私和安全性 → 麦克风，允许桌面应用访问；`--devices` 列出设备，`--device N` 指定。
 
-**全局听写：按侧键没反应？** 先跑 `Tingxie.exe --dictate --probe`，30 秒内按一下侧键看它发的是 `XBUTTON1/2` 还是某个键盘键，再对应 `--button x1/x2/f9`。完全没输出说明被鼠标厂商驱动拦走了，改映射或换键盘键。
+**想回到 v1.2 的网页版？** 旧版本仍在 [Releases](../../releases)，下载 v1.2.0 即可；两版共用同一份 `config.json` 格式。
 
-**全局听写：识别了但没进窗口？** 目标窗口若以管理员权限运行，Windows 会阻止普通进程注入（UIPI）；文字会留在剪贴板，手动 Ctrl+V。个别终端屏蔽 Ctrl+V 时可加 `--type` 逐字输入。
-
-**全局听写：两个窗口都开着会怎样？** 侧键会被先启动的那个独占，第二个实例会直接提示「已有一个听写实例在运行」并退出（单实例锁）。
-
-**云端模式报 401 / 400？** 检查 `config.json` 里的 `api_key` 与 `base_url`（要带 `/v1`）、`model` 是否是那个服务商支持的语音模型名；不同服务商的返回字段差异已做兼容（`text` / `data.text` / `segments`）。
-
-**云端和本地怎么选？** 日常用 `auto`：有 key 时走云端，网络抖动或额度用完就自动回退本地，不会丢话；开会/隐私场景用 `--asr local`。
-
-**全局听写：麦克风没声音？** Windows 设置 → 隐私和安全性 → 麦克风，打开「允许桌面应用访问麦克风」；`--devices` 列出设备后用 `--device N` 指定。
-
-**杀毒软件报警？** PyInstaller 打包的未签名 EXE 常被启发式误报。可自行从源码构建，或对该目录加白名单。
+**杀软报警？** PyInstaller 打包的未签名 EXE 常被启发式误报；可自行从源码构建，或对该目录加白名单。
 
 ## 路线图
 
-- [x] 全局侧键听写（说完即上屏）
-- [ ] 边说边出字（流式解码，边说边插入）
-- [ ] 托盘图标 + 不占控制台窗口的后台模式
-- [ ] 说话人分离与自动分段标题
-- [ ] 模型可选（base / small / medium）与量化档位切换
-- [ ] macOS / Linux 构建
+- [ ] 托盘图标，彻底不占控制台窗口
+- [ ] 边说边出字（流式解码）
+- [ ] 模型档位切换（base / small / medium）
+- [ ] 识别历史（可选，默认关闭）
 
 ## 许可证
 
-[MIT](LICENSE)。Whisper 模型权重来自 OpenAI（MIT），`faster-whisper` 与 CTranslate2 遵循各自许可，详见打包目录 `_internal/licenses/`。
+[MIT](LICENSE)。Whisper 权重为 OpenAI 的 MIT 许可；`faster-whisper`、CTranslate2、PortAudio 按各自许可分发。
 
 ---
 
-**English**: Tingxie is a fully offline, local speech-to-text desktop tool for Windows 10/11 x64. Record from the microphone or import audio (WAV/MP3/M4A/FLAC/WebM…), transcribe with Whisper Base on CPU via faster-whisper, then edit, copy or export to TXT. No cloud, no account, no GPU — models are bundled and the very first run works without a network connection. See [README_EN.md](README_EN.md) for the English documentation.
+English docs: [README_EN.md](README_EN.md)

@@ -13,10 +13,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 ROOT = Path(SPECPATH).resolve()  # noqa: F821 - SPECPATH 由 PyInstaller 注入
 MODEL_DIR = ROOT / "models" / "whisper-base"
 
-datas = [
-    (str(ROOT / "templates"), "templates"),
-    (str(ROOT / "static"), "static"),
-]
+datas: list = []
 if MODEL_DIR.is_dir():
     datas.append((str(MODEL_DIR), "models/whisper-base"))
 
@@ -31,20 +28,20 @@ try:
             print(f"[tingxie.spec] 未找到 PortAudio 目录：{portaudio}")
     else:
         print("[tingxie.spec] 未安装 sounddevice，全局听写将不可用")
-except Exception as exc:  # 缺少 sounddevice 时仍可打出纯网页版
+except Exception as exc:  # 缺少 sounddevice 时仍可打包（只是没有麦克风录音）
     print(f"[tingxie.spec] sounddevice 检查失败：{exc}")
 
 # faster-whisper 运行时按需导入 ctranslate2 / tokenizers / onnxruntime(VAD)
 hiddenimports = (
     collect_submodules("faster_whisper")
     + collect_submodules("ctranslate2")
-    + ["onnxruntime", "av", "waitress", "sounddevice", "cffi"]
+    + ["onnxruntime", "av", "sounddevice", "cffi"]
 )
 datas.append((str(ROOT / "config.example.json"), "config.example.json"))
 datas += collect_data_files("faster_whisper", include_py_files=False)
 
 a = Analysis(
-    ["app.py"],
+    ["app.py"],  # app.py 只做一层转发，真正逻辑在 dictation.py / asr.py / transcriber.py
     pathex=[str(ROOT)],
     binaries=[],
     datas=datas,
@@ -52,7 +49,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "pytest", "setuptools", "pip", "httpcore2", "httpx2"],
+    excludes=["tkinter", "pytest", "setuptools", "pip", "flask", "waitress", "jinja2", "werkzeug"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

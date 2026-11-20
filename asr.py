@@ -148,7 +148,7 @@ def transcribe_online(audio: "np.ndarray", language: str, online_cfg: dict) -> d
 
     fields = {"model": model, "response_format": "json"}
     if online_cfg.get("send_language", True) and language in ("zh", "en"):
-        fields["language"] = "zh" if language == "zh" else "en"
+        fields["language"] = language
 
     wav = encode_wav(audio)
     boundary, body = build_multipart(fields, "audio.wav", wav)
@@ -210,7 +210,7 @@ class AsrRouter:
 
     @property
     def model_ready(self) -> bool:
-        """当前模式下是否可用（网页版用它决定按钮是否可点）。"""
+        """当前模式下是否可以开始识别。"""
         if self.mode == "online":
             return self.online_ready or (self.fallback and self.local_ready)
         if self.mode == "local":

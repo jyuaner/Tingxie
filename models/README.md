@@ -44,6 +44,7 @@ python scripts/fetch_model.py
 
 ```powershell
 python app.py --model models/whisper-large-v3
+# 打包版：Tingxie.exe --model D:\models\whisper-large-v3
 ```
 
 体积与速度大致线性增长，CPU 上 `small` 通常仍是可接受的选择；`medium` 及以上建议配更多核心。
@@ -53,4 +54,5 @@ python app.py --model models/whisper-large-v3
 
 - `HF_HUB_OFFLINE=1` 与 `local_files_only=True` 已经生效，模型缺失时程序**不会**偷偷联网下载，只会报错；
 - 权重来源：OpenAI Whisper（MIT），CTranslate2 转换版由 Systran 发布；
-- 首次识别需要加载模型，CPU 上约有 1–5 秒预热时间，之后同一进程内复用。
+- 首次识别需要加载模型，CPU 上约有 1–5 秒预热时间，之后同一进程内复用；
+- 只用云端（`--asr online`）时可以不准备本地模型。

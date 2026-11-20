@@ -844,7 +844,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="触发键：x1/x2/middle、f9、ctrl+shift+d、vk:0x7B（--button/--key 是它的别名）",
     )
     parser.add_argument("--list-keys", action="store_true", help="列出可用的键盘按键名后退出")
-    parser.add_argument("--language", default="zh", choices=["zh", "en", "auto"], help="识别语言")
+    parser.add_argument(
+        "--language", default="zh", choices=["zh", "en", "auto"],
+        help="识别语言：zh 中文 / en 英文 / auto 自动",
+    )
     parser.add_argument("--asr", default="", choices=["", "auto", "local", "online"],
                         help="识别引擎：local 离线 / online 云端 / auto 自动（默认按 config.json）")
     parser.add_argument("--config", default=None, help="配置文件路径（默认 EXE 同目录的 config.json）")
