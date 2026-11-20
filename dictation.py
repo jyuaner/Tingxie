@@ -304,6 +304,7 @@ class Recorder:
         rates = [self.samplerate] + ([device_rate] if device_rate != self.samplerate else [])
         last_error: Exception | None = None
         for rate in rates:
+            stream = None
             try:
                 stream = sd.InputStream(
                     samplerate=rate,
@@ -316,6 +317,11 @@ class Recorder:
                 stream.start()
             except Exception as exc:  # 有些声卡只接受原生采样率（多为 48 kHz）
                 last_error = exc
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
                 continue
             with self._lock:
                 self._chunks = []
@@ -444,13 +450,16 @@ class Dictation:
         self._hooks = []
         hook = user32.SetWindowsHookExW(WH_MOUSE_LL, self._mouse_proc, None, 0)
         if not hook:
-            raise SystemExit(f"鼠标钩子安装失败：{ctypes.get_last_error()}")
+            # 有些安全软件会拦钩子；不退出，交给 --hotkey / 自动回退处理
+            self.log(f"鼠标钩子安装失败（错误码 {ctypes.get_last_error()}）", "✗")
+            return False
         self._hooks.append(hook)
         hook = user32.SetWindowsHookExW(WH_KEYBOARD_LL, self._key_proc, None, 0)
         if hook:
             self._hooks.append(hook)
         else:
             self.log("键盘钩子安装失败，Esc 取消不可用（不影响主流程）", "!")
+        return True
 
     def check_hook(self, timeout: float = 1.2) -> bool:
         """启动自检：合成一次 1 像素的鼠标移动，确认钩子真的能收到事件。
@@ -837,15 +846,21 @@ def main(argv: list[str] | None = None) -> int:
     if not instance:
         print("创建单实例锁失败，仍继续启动。", flush=True)
 
-    app.install()
+    hook_ok = app.install()
     if not args.no_autofallback:
-        if app.check_hook():
+        if not hook_ok:
+            print("鼠标钩子不可用（可能被安全软件拦截），只能靠快捷键触发", flush=True)
+        elif app.check_hook():
             print("钩子自检：通过", flush=True)
         else:
             print("钩子自检：没收到任何鼠标事件，侧键可能不可用", flush=True)
-            if not args.hotkey:
-                args.hotkey = "ctrl+alt+d"
-                print("已自动改用备用快捷键 ctrl+alt+d（可用 --hotkey 换键）", flush=True)
+            hook_ok = False
+        if not hook_ok and not args.hotkey:
+            args.hotkey = "ctrl+alt+d"
+            print("已自动改用备用快捷键 ctrl+alt+d（可用 --hotkey 换键）", flush=True)
+    if not hook_ok and not args.hotkey:
+        print("侧键和快捷键都不可用，无法继续。请加 --hotkey ctrl+alt+d 再试。", flush=True)
+        return 2
     app.register_hotkey()
     try:
         import signal
